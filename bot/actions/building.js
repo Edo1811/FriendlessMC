@@ -1,8 +1,6 @@
-import pathfinderPkg from 'mineflayer-pathfinder';
 import vec3 from 'vec3';
 import { abortable, inventoryItem } from './util.js';
-
-const { goals } = pathfinderPkg;
+import { pathTo, near } from './pathing.js';
 
 const FACES = [
   vec3(0, -1, 0), vec3(0, 1, 0), vec3(1, 0, 0), vec3(-1, 0, 0), vec3(0, 0, 1), vec3(0, 0, -1),
@@ -13,12 +11,9 @@ function isReplaceable(block) {
     block.name === 'lava' || block.name === 'short_grass' || block.name === 'tall_grass' || block.name === 'snow';
 }
 
-async function moveWithinReach(bot, pos, signal) {
+export async function moveWithinReach(bot, pos, signal) {
   if (bot.entity.position.distanceTo(pos.offset(0.5, 0.5, 0.5)) <= 4) return;
-  await abortable(signal, bot.pathfinder.goto(new goals.GoalNear(pos.x, pos.y, pos.z, 3)), () => {
-    bot.pathfinder.setGoal(null);
-    bot.pathfinder.stop();
-  });
+  await pathTo(bot, near(pos.x, pos.y, pos.z, 3), signal);
 }
 
 async function placeOne(bot, { item, x, y, z }, signal) {

@@ -1,13 +1,8 @@
-import pathfinderPkg from 'mineflayer-pathfinder';
-import { abortable, inventoryItem, itemByName, playerEntity, countItem } from './util.js';
-
-const { goals } = pathfinderPkg;
+import { inventoryItem, itemByName, playerEntity, countItem } from './util.js';
+import { pathTo, near } from './pathing.js';
 
 async function walkTo(bot, pos, range, signal) {
-  await abortable(signal, bot.pathfinder.goto(new goals.GoalNear(pos.x, pos.y, pos.z, range)), () => {
-    bot.pathfinder.setGoal(null);
-    bot.pathfinder.stop();
-  });
+  await pathTo(bot, near(pos.x, pos.y, pos.z, range), signal);
 }
 
 export async function equip(bot, { item, slot = 'hand' }) {

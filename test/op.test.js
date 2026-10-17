@@ -15,11 +15,34 @@ test('normal op-mode commands pass', () => {
   ok('gamerule randomTickSpeed 3');
 });
 
-test('commands outside the list are refused', () => {
+test('any other command is allowed now', () => {
+  ok('effect give Edo speed 30 1');
+  ok('enchant Edo sharpness 3');
+  ok('execute at Edo run setblock ~ ~-1 ~ gold_block');
+  ok('gamemode creative');
+  ok('gamemode creative @s');
+  ok('gamemode spectator Claude');
+});
+
+test('commands that take over the server are refused, also hidden or namespaced', () => {
   refused('op Steve');
-  refused('kill @e');
-  refused('execute run fill 0 0 0 1 1 1 air');
+  refused('minecraft:op Steve');
+  refused('/deop Edo');
   refused('stop');
+  refused('ban Luca');
+  refused('kick Luca');
+  refused('whitelist off');
+  refused('reload');
+  refused('execute as Edo run op Luca');
+  refused('execute run execute run stop');
+  refused('lp user Luca permission set *');
+});
+
+test("game mode: only Claude's own", () => {
+  refused('gamemode creative Edo');
+  refused('gamemode creative @a');
+  refused('defaultgamemode creative');
+  assert.equal(checkOpCommand('gamemode creative Bob', createOpLimiter(), Date.now(), 'Bob'), null);
 });
 
 test('crash and lag ingredients are refused', () => {

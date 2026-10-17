@@ -9,10 +9,11 @@ import * as gathering from '../bot/actions/gathering.js';
 import * as building from '../bot/actions/building.js';
 import * as combat from '../bot/actions/combat.js';
 import * as items from '../bot/actions/items.js';
+import * as controls from '../bot/actions/controls.js';
+import * as interact from '../bot/actions/interact.js';
 import { checkOpCommand, createOpLimiter, runCommand } from '../bot/actions/op.js';
 import { sleep } from '../bot/actions/util.js';
 import * as memory from './memory.js';
-import { queueFileEdit } from './fileEdits.js';
 
 export const SERVER_NAME = 'minecraft';
 
@@ -132,19 +133,61 @@ export function createGameServer(ctx) {
     }, action('follow', (bot, { player, distance, max_seconds }, s) =>
       movement.follow(bot, { player, distance, maxSeconds: max_seconds }, s))),
 
-    tool('look_at_player', 'Turn to look at a player.', { player: z.string() },
-      quick((a) => movement.lookAtPlayer(requireBot(), a))),
-
-    tool('jump', 'Jump once.', {}, action('jump', (bot, a, s) => movement.jump(bot, a, s))),
-
-    tool('stop', 'Stop moving/fighting/digging right now.', {}, quick(() => {
+    tool('stop', 'Stop moving/fighting/digging/flying right now.', {}, quick(() => {
       const bot = requireBot();
       abortCurrentAction(ctx.state, 'stop was called');
       bot.pathfinder.setGoal(null);
       bot.pvp.stop();
       bot.stopDigging();
+      bot.clearControlStates();
       return 'Stopped.';
     })),
+
+    // ---- raw controls (anything a player can do with keys and mouse) ----
+    tool('control', 'Hold movement keys like a player, e.g. ["forward","jump"] for 600ms to hop up a block, or ["sneak"] to crouch. Optional yaw (F3 degrees: 0 south, 90 west, 180 north, 270 east) to face first.', {
+      keys: z.array(z.enum(controls.CONTROL_KEYS)).min(1),
+      ms: z.number().int().min(50).max(10_000).optional(),
+      yaw: z.number().optional(),
+    }, action('control', (bot, a, s) => controls.control(bot, a, s))),
+
+    tool('look', 'Turn your head: at a player, at a block (x y z), or to yaw/pitch in F3 degrees (pitch 90 = down). Tells you what block you are looking at.', {
+      player: z.string().optional(),
+      x: coord.optional(), y: coord.optional(), z: coord.optional(),
+      yaw: z.number().optional(), pitch: z.number().min(-90).max(90).optional(),
+    }, quick((a) => controls.look(requireBot(), a))),
+
+    tool('hit', 'Left click once: hit an entity (player name or mob type) within reach, or just swing if no target.', {
+      target: z.string().optional(),
+    }, quick((a) => controls.hit(requireBot(), a))),
+
+    // ---- right click ----
+    tool('use_item', 'Right click with the held item: eat, drink, throw pearls/snowballs, use buckets, shield... hold_ms keeps it pressed (about 1000 to fully draw a bow).', {
+      offhand: z.boolean().optional(),
+      hold_ms: z.number().int().min(0).max(5000).optional(),
+    }, action('use_item', (bot, { offhand, hold_ms }, s) => interact.useItem(bot, { offhand, holdMs: hold_ms }, s))),
+
+    tool('use_block', 'Walk up to a block and right click it: doors, trapdoors, gates, levers, buttons, note blocks, beds, bells...', {
+      x: coord, y: coord, z: coord,
+    }, action('use_block', (bot, a, s) => interact.useBlock(bot, a, s))),
+
+    tool('use_entity', 'Walk up to an entity and right click it with the held item: breed, feed, shear, name tag, leash, milk...', {
+      target: z.string().describe('Player name or mob type like "cow"'),
+    }, action('use_entity', (bot, a, s) => interact.useEntity(bot, a, s))),
+
+    tool('mount', 'Get on a boat, minecart, horse, pig, strider...', { target: z.string() },
+      action('mount', (bot, a, s) => interact.mount(bot, a, s))),
+
+    tool('dismount', 'Get off whatever you are riding.', {}, quick(() => interact.dismount(requireBot()))),
+
+    // ---- flying ----
+    tool('elytra_fly', 'Fly with an elytra toward coordinates (uses firework rockets if you have them). Start from somewhere high.', {
+      x: coord, y: coord, z: coord,
+    }, action('elytra_fly', (bot, a, s) => controls.elytraFly(bot, a, s))),
+
+    tool('fly_to', 'Creative/spectator only: fly straight to coordinates.', { x: coord, y: coord, z: coord },
+      action('fly_to', (bot, a, s) => controls.flyTo(bot, a, s))),
+
+    tool('stop_flying', 'Creative only: stop flying and drop down.', {}, quick(() => controls.stopFlying(requireBot()))),
 
     // ---- world ----
     tool('mine', 'Find, mine and pick up blocks of a type, e.g. 10 "oak_log" (or just "log" for any).', {
@@ -188,6 +231,33 @@ export function createGameServer(ctx) {
     tool('sleep_in_bed', 'Go to the nearest bed and sleep.', {},
       action('sleep_in_bed', (bot, a, s) => items.sleepInBed(bot, a, s))),
 
+    // ---- storage, stations, villagers ----
+    tool('container', 'Chests, barrels, shulker boxes, ender chests, hoppers, dispensers. action "look" lists what is inside; "take"/"put" move items (all of that item if no count).', {
+      x: coord, y: coord, z: coord,
+      action: z.enum(['look', 'take', 'put']),
+      item: z.string().optional(),
+      count: z.number().int().min(1).optional(),
+    }, action('container', (bot, a, s) => interact.container(bot, a, s))),
+
+    tool('furnace', 'Furnace, smoker or blast furnace. "load" puts input and/or fuel in, "collect" takes the result, "check" shows what is inside.', {
+      x: coord, y: coord, z: coord,
+      action: z.enum(['load', 'collect', 'check']),
+      input: z.string().optional(),
+      fuel: z.string().optional(),
+      count: z.number().int().min(1).max(64).optional(),
+    }, action('furnace', (bot, a, s) => interact.furnace(bot, a, s))),
+
+    tool('trade', 'Villager trading. Without trade_index it lists the nearest villager\'s trades; with it, trades that many times.', {
+      target: z.string().optional().describe('"villager" (default) or "wandering_trader"'),
+      trade_index: z.number().int().min(0).optional(),
+      times: z.number().int().min(1).max(64).optional(),
+    }, action('trade', (bot, { target, trade_index, times }, s) =>
+      interact.trade(bot, { target, tradeIndex: trade_index, times }, s))),
+
+    tool('fish', 'Fish with a fishing rod until something bites (or max_seconds).', {
+      max_seconds: z.number().int().min(5).max(120).optional(),
+    }, action('fish', (bot, { max_seconds }, s) => interact.fish(bot, { maxSeconds: max_seconds }, s))),
+
     // ---- modes ----
     tool('start_focus', 'Start focus mode: you keep thinking after every action instead of waiting for events. Only an op can ask for it; you can say no.', {
       requested_by: requestedBy,
@@ -221,27 +291,16 @@ export function createGameServer(ctx) {
       return `Op mode on (unlocked by ${requested_by}). Announce every op action.`;
     })),
 
-    tool('op_command', `Run an admin command (op mode only): /fill /setblock /clone /tp /summon /give /time /weather /gamerule. The announcement is posted in chat first as "using op powers: <announcement>".`, {
+    tool('op_command', `Run any server command (op mode only), e.g. /fill /setblock /clone /tp /summon /give /effect /enchant /time /weather /gamerule, /gamemode for yourself. Commands that take over the server (op, ban, kick, stop, whitelist, reload...) are off-limits. The announcement is posted in chat first as "using op powers: <announcement>".`, {
       command: z.string().describe('Without the leading slash, e.g. "fill 10 64 10 20 64 20 stone"'),
       announcement: z.string().min(3).max(120).describe('Short plain description, e.g. "filling the lake"'),
     }, quick(async ({ command, announcement }) => {
       const bot = requireBot();
       if (!ctx.state.opMode.enabled) return 'Op mode is off. An op has to unlock it first.';
-      const problem = checkOpCommand(command, opLimiter);
+      const problem = checkOpCommand(command, opLimiter, Date.now(), bot.username);
       if (problem) return `Refused: ${problem}`;
       bot.chat(`using op powers: ${announcement}`);
       return `Server said: ${await runCommand(bot, command)}`;
-    })),
-
-    tool('request_file_edit', 'Op mode only, rare: queue a change to server files that commands cannot do. It is applied the next time the server restarts.', {
-      description: z.string().min(10).max(1000),
-      requested_by: requestedBy,
-    }, quick(({ description, requested_by }) => {
-      if (!ctx.state.opMode.enabled) return 'Op mode is off.';
-      const problem = checkRequester(requested_by, 'request file edits');
-      if (problem) return problem;
-      const n = queueFileEdit(description, requested_by);
-      return `Queued (${n} pending). It happens the next time the server is stopped and started again.`;
     })),
 
     // ---- memory ----

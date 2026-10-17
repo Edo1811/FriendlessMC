@@ -50,6 +50,9 @@ function connect() {
     const movements = new Movements(bot);
     movements.allow1by1towers = true;
     movements.canDig = true;
+    movements.allowParkour = true;
+    movements.allowSprinting = true;
+    movements.canOpenDoors = true;
     bot.pathfinder.setMovements(movements);
 
     ctx.bot = bot;

@@ -4,7 +4,6 @@ import path from 'node:path';
 import fs from 'node:fs';
 import readline from 'node:readline';
 import { loadConfig, SERVER_DIR, ROOT, SKIN_URL } from './lib/config.js';
-import { applyPendingEdits } from './bridge/fileEdits.js';
 
 const config = loadConfig();
 const log = (msg) => console.log(`[start] ${msg}`);
@@ -12,13 +11,6 @@ const log = (msg) => console.log(`[start] ${msg}`);
 if (!fs.existsSync(path.join(SERVER_DIR, 'paper.jar'))) {
   log('No server found. Run the setup wizard first: npm run wizard');
   process.exit(1);
-}
-
-// queued op-mode file edits can only be applied while the server is stopped
-try {
-  await applyPendingEdits(config, log);
-} catch (err) {
-  log(`Couldn't apply queued file edits: ${err.message}`);
 }
 
 log('Starting the Minecraft server...');

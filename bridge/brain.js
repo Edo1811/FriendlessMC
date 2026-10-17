@@ -6,12 +6,14 @@ import { status } from '../bot/actions/perception.js';
 import { AsyncQueue } from './asyncQueue.js';
 import { createGameServer, SERVER_NAME } from './tools.js';
 import { claudeEnv } from './auth.js';
+import { FILE_TOOLS, fileToolHook } from './files.js';
 
-const DEBOUNCE_MS = 1500;
+const DEBOUNCE_MS = 500;
 const ERROR_BACKOFF_MS = 60_000;
 
 const BASE_PROMPT = `You are Claude, made by Anthropic, playing Minecraft as a normal player called "Claude".
-You act only through the minecraft tools. Text you write outside a tool call is never seen by players;
+You act through the minecraft tools, and can read the server's files (and write them in op mode)
+with the file tools. Text you write outside a tool call is never seen by players;
 use the say tool to talk. Each message you get describes what just happened in the game.
 When you have nothing more to do, just end your turn: you'll be woken up when something happens.`;
 
@@ -42,11 +44,13 @@ export class Brain {
         model: config.model,
         effort: config.effort,
         systemPrompt: `${BASE_PROMPT}\n\n${instructions}`,
-        // only .claude/settings.json (deny-everything-else permissions). CLAUDE.md is already in the
-        // system prompt, so it's excluded from auto-loading to avoid sending it twice.
+        // only .claude/settings.json (denies everything outside the game). CLAUDE.md is already in
+        // the system prompt, so it's excluded from auto-loading to avoid sending it twice.
         settingSources: ['project'],
         settings: { claudeMdExcludes: ['**/CLAUDE.md'] },
-        tools: [],
+        // Claude Code's file tools, for the server folder only (checked by the hook)
+        tools: FILE_TOOLS,
+        hooks: { PreToolUse: [fileToolHook(() => this.ctx.state)] },
         mcpServers: { [SERVER_NAME]: server },
         allowedTools: toolNames,
         permissionMode: 'dontAsk',

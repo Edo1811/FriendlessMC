@@ -1,7 +1,10 @@
-// Op mode: the commands Claude may use, plus the hard limit against anything that crashes or lags.
+// Op mode: every command except the ones that take over the server, plus the hard limit
+// against anything that crashes or lags.
 
-export const ALLOWED_COMMANDS = new Set([
-  'fill', 'setblock', 'clone', 'tp', 'teleport', 'summon', 'give', 'time', 'weather', 'gamerule',
+export const BLOCKED_COMMANDS = new Set([
+  'op', 'deop', 'stop', 'restart', 'reload', 'rl', 'ban', 'ban-ip', 'pardon', 'pardon-ip', 'kick',
+  'whitelist', 'save-off', 'forceload', 'debug', 'perf', 'jfr', 'spark', 'timings',
+  'transfer', 'lp', 'luckperms', 'pex', 'permissions', 'plugman', 'sudo',
 ]);
 
 // Items/blocks/NBT that are the usual ingredients of crash or lag tricks.
@@ -32,12 +35,24 @@ export function createOpLimiter() {
   return { summons: [] };
 }
 
-// Returns null if the command is OK, or a reason it's refused.
-export function checkOpCommand(raw, limiter, now = Date.now()) {
-  const command = raw.trim().replace(/^\//, '');
-  const name = command.split(/\s+/)[0]?.toLowerCase();
+// "minecraft:op" / "bukkit:kick" are the same commands with a namespace
+const commandName = (word) => word?.toLowerCase().replace(/^[a-z0-9_.-]+:/, '') ?? '';
 
-  if (!ALLOWED_COMMANDS.has(name)) return `/${name} isn't one of the op-mode commands.`;
+// `/execute ... run <command>` runs another command, which has to pass the same checks
+const nestedCommand = (command) => command.match(/\brun\s+(.+)$/i)?.[1] ?? null;
+
+// Returns null if the command is OK, or a reason it's refused.
+export function checkOpCommand(raw, limiter, now = Date.now(), botName = 'Claude') {
+  const command = raw.trim().replace(/^\//, '');
+  const name = commandName(command.split(/\s+/)[0]);
+
+  if (!name) return 'Empty command.';
+  if (BLOCKED_COMMANDS.has(name)) return `/${name} is off-limits, even in op mode.`;
+  const inner = nestedCommand(command);
+  if (inner) {
+    const problem = checkOpCommand(inner, limiter, now, botName);
+    if (problem) return problem;
+  }
   if (command.length > MAX_COMMAND_LENGTH) return `Command is too long (max ${MAX_COMMAND_LENGTH} chars).`;
   for (const pattern of BANNED_PATTERNS) {
     if (pattern.test(command)) return `Blocked by the no-crash/no-lag rule (${pattern.source}).`;
@@ -56,6 +71,14 @@ export function checkOpCommand(raw, limiter, now = Date.now()) {
   if (name === 'give') {
     const count = Number(command.split(/\s+/)[3] ?? 1);
     if (count > 64 * 36) return 'That is more than a full inventory.';
+  }
+
+  if (name === 'gamemode' || name === 'defaultgamemode') {
+    // Claude can change its own game mode; other players' modes are their own business
+    const target = command.split(/\s+/)[2];
+    if (name === 'defaultgamemode' || (target && target !== '@s' && target.toLowerCase() !== botName.toLowerCase())) {
+      return "Op mode only lets you change your own game mode.";
+    }
   }
 
   if (name === 'summon') {

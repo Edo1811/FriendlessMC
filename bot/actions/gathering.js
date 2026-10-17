@@ -1,4 +1,5 @@
 import { abortable, blockIdsMatching, countItem } from './util.js';
+import { watchStuck } from './pathing.js';
 
 // Mines `count` blocks of a type and picks up the drops. Checks for interrupts between blocks.
 export async function mine(bot, { block, count = 1, maxDistance = 48 }, signal) {
@@ -15,15 +16,17 @@ export async function mine(bot, { block, count = 1, maxDistance = 48 }, signal) 
       failure = `couldn't find more ${block} within ${maxDistance} blocks`;
       break;
     }
+    const cancel = () => bot.collectBlock.cancelTask().catch(() => {});
+    const stopWatching = watchStuck(bot, cancel);
     try {
-      await abortable(signal, bot.collectBlock.collect(target, { ignoreNoPath: false }), () =>
-        bot.collectBlock.cancelTask().catch(() => {}),
-      );
+      await abortable(signal, bot.collectBlock.collect(target, { ignoreNoPath: false }), cancel);
       mined++;
     } catch (err) {
       if (signal.aborted) throw err;
       failure = err.message;
       break;
+    } finally {
+      stopWatching();
     }
   }
 

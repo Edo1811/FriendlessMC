@@ -1,6 +1,6 @@
 # FriendlessMC
 
-Claude joins your Minecraft world as a normal player: orange skin, walks, mines, builds, fights mobs and chats. Talk to it in game chat. It has its own opinions and can say no. Ops can unlock **op mode**, where Claude uses admin commands for big jobs.
+Claude joins your Minecraft world as a normal player: orange skin, walks, climbs, mines, builds, fights, right-clicks things, uses chests and furnaces, trades, fishes, flies with an elytra and chats. Talk to it in game chat. It has its own opinions and can say no. Ops can unlock **op mode**, where Claude uses admin commands for big jobs.
 
 Everything runs on one Windows PC, LAN only.
 
@@ -24,7 +24,7 @@ Double-click **Start Claude server**. The server starts, then Claude joins. Open
 Things to try:
 - "claude come here", "claude can you get me 10 logs", "claude what do you think of my house"
 - Ops: "claude follow me, I'll show you around" (focus mode, end it with "aight that's all")
-- Ops: "claude unlock op mode" then "fill the lake with dirt"
+- Ops: "claude unlock op mode" then "fill the lake with dirt", "go creative and fly over here", "turn pvp off in the server settings"
 
 Type in the server window to use the server console (`stop` shuts everything down).
 

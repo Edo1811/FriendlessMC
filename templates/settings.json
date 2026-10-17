@@ -3,12 +3,7 @@
     "defaultMode": "dontAsk",
     "deny": [
       "Bash",
-      "Read",
-      "Edit",
-      "Write",
       "NotebookEdit",
-      "Glob",
-      "Grep",
       "WebFetch",
       "WebSearch",
       "Agent",
