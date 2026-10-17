@@ -95,9 +95,9 @@ export function checkOpCommand(raw, limiter, now = Date.now(), botName = 'Claude
 // Sends a command and collects the server's feedback for a moment.
 export async function runCommand(bot, command, waitMs = 1200) {
   const feedback = [];
+  // anything the server says in this window except player chat counts as feedback
   const onMessage = (msg, position) => {
-    // some servers send player chat as system messages too; that isn't command feedback
-    if ((position === 'system' || position === 'game_info') && !/^<[^>]+> /.test(msg)) feedback.push(msg);
+    if (position !== 'chat' && !/^(\[Not Secure\] )?<[^>]+> /.test(msg)) feedback.push(msg);
   };
   bot.on('messagestr', onMessage);
   try {

@@ -1,6 +1,6 @@
 # FriendlessMC
 
-Claude joins your Minecraft world as a normal player: orange skin, walks, climbs, mines, builds, fights, right-clicks things, uses chests and furnaces, trades, fishes, flies with an elytra and chats. Talk to it in game chat. It has its own opinions and can say no. Ops can unlock **op mode**, where Claude uses admin commands for big jobs.
+Claude joins your Minecraft world as a normal player: orange skin, walks, climbs, mines, builds, fights, right-clicks things, uses chests and furnaces, trades, fishes, flies with an elytra, takes screenshots to actually see your builds, and chats. Talk to it in game chat. It has its own opinions and can say no. Ops can unlock **op mode**, where Claude uses admin commands for big jobs.
 
 Everything runs on one Windows PC, LAN only.
 
@@ -30,7 +30,9 @@ Type in the server window to use the server console (`stop` shuts everything dow
 
 ## How it uses your Claude plan
 
-Claude only thinks when something happens: someone chats, it takes damage, a mob comes close, someone joins/leaves, or every 5 minutes when it's quiet. When nobody is online it sleeps. Focus mode thinks after every action, so it uses more. Settings live in `server/friendless.json` (`model`, `effort`, `idleThinkMinutes`).
+Claude only thinks when something happens: someone chats, it takes damage, a mob comes close, someone joins/leaves, or every 5 minutes when it's quiet. When nobody is online it sleeps. Focus mode thinks after every action, so it uses more. Settings live in `server/friendless.json` (`model`, `effort`, `idleThinkMinutes`, `screenshots`). For faster answers, try `"model": "claude-sonnet-5-5"`.
+
+Screenshots are rendered in a hidden Microsoft Edge window (built into Windows), only while Claude is taking them.
 
 ## Files
 

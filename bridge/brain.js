@@ -44,11 +44,10 @@ export class Brain {
         model: config.model,
         effort: config.effort,
         systemPrompt: `${BASE_PROMPT}\n\n${instructions}`,
-        // only .claude/settings.json (denies everything outside the game). CLAUDE.md is already in
-        // the system prompt, so it's excluded from auto-loading to avoid sending it twice.
-        settingSources: ['project'],
-        settings: { claudeMdExcludes: ['**/CLAUDE.md'] },
-        // Claude Code's file tools, for the server folder only (checked by the hook)
+        // No settings files: the permissions live here in code, so an old or edited
+        // settings.json can't hide or unlock tools. CLAUDE.md is already in the system prompt.
+        settingSources: [],
+        // the only built-in tools: file tools for the server folder (checked by the hook)
         tools: FILE_TOOLS,
         hooks: { PreToolUse: [fileToolHook(() => this.ctx.state)] },
         mcpServers: { [SERVER_NAME]: server },

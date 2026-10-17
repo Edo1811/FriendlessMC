@@ -11,8 +11,10 @@ import * as combat from '../bot/actions/combat.js';
 import * as items from '../bot/actions/items.js';
 import * as controls from '../bot/actions/controls.js';
 import * as interact from '../bot/actions/interact.js';
+import { lookAround } from '../bot/actions/surroundings.js';
+import * as vision from '../bot/vision/views.js';
 import { checkOpCommand, createOpLimiter, runCommand } from '../bot/actions/op.js';
-import { sleep } from '../bot/actions/util.js';
+import { sleep, fmtPos, compass } from '../bot/actions/util.js';
 import * as memory from './memory.js';
 
 export const SERVER_NAME = 'minecraft';
@@ -50,26 +52,33 @@ export function createGameServer(ctx) {
 
   // Wraps a long game action: one at a time, interruptible by chat. Most actions take over
   // movement, so they end a background activity like following, unless keepBackground is set.
-  const action = (name, fn, { keepBackground = false } = {}) => async (args) => {
-    try {
-      const bot = requireBot();
-      if (ctx.state.action) {
-        return reply(`Already doing "${ctx.state.action.name}". Wait for it or call stop first.`);
-      }
-      if (!keepBackground) stopBackground(ctx.state);
-      const controller = new AbortController();
-      ctx.state.action = { name, controller };
+  // Every action also takes an optional `say`, said in chat as it starts: talking and acting
+  // in one call saves a whole model round-trip.
+  const action = (name, fn, { keepBackground = false } = {}) => {
+    const handler = async ({ say, ...args }) => {
       try {
-        return reply(await fn(bot, args, controller.signal));
+        const bot = requireBot();
+        if (ctx.state.action) {
+          return reply(`Already doing "${ctx.state.action.name}". Wait for it or call stop first.`);
+        }
+        if (say) bot.chat(say);
+        if (!keepBackground) stopBackground(ctx.state);
+        const controller = new AbortController();
+        ctx.state.action = { name, controller };
+        try {
+          return reply(await fn(bot, args, controller.signal));
+        } catch (err) {
+          if (controller.signal.aborted) return reply(`Interrupted: ${controller.signal.reason?.message ?? 'stopped'}.`);
+          return reply(`Failed: ${err.message}`);
+        } finally {
+          ctx.state.action = null;
+        }
       } catch (err) {
-        if (controller.signal.aborted) return reply(`Interrupted: ${controller.signal.reason?.message ?? 'stopped'}.`);
         return reply(`Failed: ${err.message}`);
-      } finally {
-        ctx.state.action = null;
       }
-    } catch (err) {
-      return reply(`Failed: ${err.message}`);
-    }
+    };
+    handler.isAction = true;
+    return handler;
   };
 
   // Wraps a quick tool that doesn't need the action slot.
@@ -113,6 +122,38 @@ export function createGameServer(ctx) {
 
     tool('block_at', 'What block is at these coordinates.', { x: coord, y: coord, z: coord },
       quick((args) => perception.blockAt(requireBot(), args))),
+
+    // ---- seeing ----
+    tool('look_around', 'Cheap text overview of the area: biome, sky or underground, what is in each direction (terrain, trees, water, hills), notable blocks like chests/beds/portals/farms, and the text on nearby signs.', {
+      range: z.number().int().min(8).max(64).optional(),
+    }, quick(({ range }) => lookAround(requireBot(), { range }))),
+
+    tool('screenshot', 'See the world: renders what you would see from your eyes and shows you the picture. Costs about 800 tokens (panorama: 4 pictures, about 1500), so use it when a picture is worth it, like when someone shows you a build. Takes a few seconds. Blocks newer than 1.21.4 look like a stand-in block, mobs/players are simple shapes.', {
+      panorama: z.boolean().optional().describe('North, east, south and west in one go'),
+      player: z.string().optional().describe('Look toward this player'),
+      yaw: z.number().optional().describe('F3 degrees: 0 south, 90 west, 180 north, 270 east. Default: where you face'),
+      pitch: z.number().min(-90).max(90).optional().describe('F3 degrees, 90 = straight down'),
+    }, async ({ panorama, player, yaw, pitch }) => {
+      try {
+        const bot = requireBot();
+        if (!ctx.vision) return reply('Screenshots are turned off.');
+        const views = vision.screenshotViews(bot, { panorama, player, yaw, pitch });
+        const size = panorama ? { width: 640, height: 360 } : { width: 960, height: 540 };
+        const shots = await ctx.vision.capture(views, size);
+        const where = `from ${fmtPos(bot.entity.position)}`;
+        return {
+          content: [
+            { type: 'text', text: withChat(`Screenshot${shots.length > 1 ? 's' : ''} ${where}: ${shots.map((s) => s.label).join(', ')}.`) },
+            ...shots.flatMap((s) => [
+              { type: 'text', text: s.label },
+              { type: 'image', data: s.data, mimeType: 'image/jpeg' },
+            ]),
+          ],
+        };
+      } catch (err) {
+        return reply(`Couldn't take a screenshot: ${err.message}`);
+      }
+    }),
 
     tool('wait', 'Wait and watch for a few seconds. Ends early if someone talks to you.', {
       seconds: z.number().min(1).max(30),
@@ -303,6 +344,24 @@ export function createGameServer(ctx) {
       return `Op mode on (unlocked by ${requested_by}). Announce every op action.`;
     })),
 
+    tool('where_is', 'Op mode only: find any online player anywhere, even far out of sight (asks the server).', {
+      player: z.string(),
+    }, quick(async ({ player }) => {
+      const bot = requireBot();
+      if (!ctx.state.opMode.enabled) return 'Finding players out of sight needs op mode.';
+      const name = Object.keys(bot.players).find((p) => p.toLowerCase() === player.toLowerCase());
+      if (!name) return `${player} isn't online.`;
+      const pos = await runCommand(bot, `data get entity ${name} Pos`);
+      const dim = await runCommand(bot, `data get entity ${name} Dimension`);
+      const nums = pos.match(/-?\d+(\.\d+)?(?=d)/g);
+      const dimension = dim.match(/"?minecraft:([a-z_]+)"?/)?.[1];
+      if (!nums || nums.length < 3) return `The server said: ${pos}`;
+      const [x, y, z] = nums.map((n) => Math.floor(Number(n)));
+      const here = bot.entity.position;
+      const dist = Math.hypot(x - here.x, z - here.z).toFixed(0);
+      return `${name} is at ${x} ${y} ${z}${dimension ? ` in ${dimension}` : ''}, ${dist} blocks ${compass(here, { x, z })} of you.`;
+    })),
+
     tool('op_command', `Run any server command (op mode only), e.g. /fill /setblock /clone /tp /summon /give /effect /enchant /time /weather /gamerule, /gamemode for yourself. Commands that take over the server (op, ban, kick, stop, whitelist, reload...) are off-limits. The announcement is posted in chat first as "using op powers: <announcement>".`, {
       command: z.string().describe('Without the leading slash, e.g. "fill 10 64 10 20 64 20 stone"'),
       announcement: z.string().min(3).max(120).describe('Short plain description, e.g. "filling the lake"'),
@@ -342,6 +401,12 @@ export function createGameServer(ctx) {
       return `Forgot ${memory.forget(t)} line(s).`;
     })),
   ];
+
+  for (const t of tools) {
+    if (t.handler.isAction) {
+      t.inputSchema = { ...t.inputSchema, say: z.string().min(1).max(256).optional().describe('Say this in chat as you start') };
+    }
+  }
 
   const server = createSdkMcpServer({ name: SERVER_NAME, version: '1.0.0', tools, alwaysLoad: true });
   const toolNames = tools.map((t) => `mcp__${SERVER_NAME}__${t.name}`);

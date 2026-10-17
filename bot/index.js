@@ -9,7 +9,9 @@ import { ChatLog } from './chat.js';
 import { ModeManager } from './modes.js';
 import { attachEvents } from './events.js';
 import { attachReflexes } from './reflexes.js';
+import { applyCompatPatches } from './compat.js';
 import { Brain } from '../bridge/brain.js';
+import { Vision } from './vision/index.js';
 
 const { pathfinder, Movements } = pathfinderPkg;
 const RECONNECT_MS = 10_000;
@@ -26,6 +28,14 @@ const ctx = {
   chat: new ChatLog(),
 };
 ctx.brain = new Brain(ctx, log);
+ctx.vision = config.screenshots
+  ? new Vision(() => ctx.bot, {
+    port: config.screenshotPort,
+    viewDistance: config.screenshotViewDistance,
+    browserPath: config.browserPath,
+    log,
+  })
+  : null;
 ctx.modes = new ModeManager(ctx);
 
 function connect() {
@@ -47,6 +57,7 @@ function connect() {
 
   bot.once('spawn', () => {
     log('[bot] Spawned in the world.');
+    applyCompatPatches(bot);
     const movements = new Movements(bot);
     movements.allow1by1towers = true;
     movements.canDig = true;
@@ -77,8 +88,9 @@ ctx.brain.start();
 ctx.modes.start();
 connect();
 
-process.on('SIGINT', () => {
+process.on('SIGINT', async () => {
   ctx.brain.stop();
+  await ctx.vision?.stop();
   ctx.bot?.quit();
   process.exit(0);
 });

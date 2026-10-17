@@ -98,7 +98,6 @@ function writeClaudeFolder(owner, ops) {
     path.join(CLAUDE_DIR, 'CLAUDE.md'),
     template.replaceAll('{{OWNER}}', owner).replaceAll('{{OPS}}', ops.join(', ')),
   );
-  fs.copyFileSync(path.join(ROOT, 'templates', 'settings.json'), path.join(CLAUDE_DIR, 'settings.json'));
   const memory = path.join(CLAUDE_DIR, 'memory.md');
   if (!fs.existsSync(memory)) fs.copyFileSync(path.join(ROOT, 'templates', 'memory.md'), memory);
 }
@@ -137,7 +136,7 @@ export async function buildServer(options, log) {
   writeOps(ops, DEFAULTS.botName);
   fs.writeFileSync(path.join(SERVER_DIR, 'eula.txt'), `# Accepted in the setup wizard on ${new Date().toISOString()}\neula=true\n`);
 
-  log("Creating Claude's .claude folder (instructions, memory, permissions)...");
+  log("Creating Claude's .claude folder (instructions, memory)...");
   writeClaudeFolder(owner, ops);
 
   saveConfig({ ...DEFAULTS, mcVersion: version, ops, owner });

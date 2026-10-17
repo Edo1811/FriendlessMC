@@ -37,6 +37,16 @@ export function sleep(ms, signal) {
   });
 }
 
+// Compass direction from one position to another (north is -z, east is +x).
+const COMPASS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+export function compass(from, to) {
+  const dx = to.x - from.x;
+  const dz = to.z - from.z;
+  if (Math.hypot(dx, dz) < 1) return 'here';
+  const angle = (Math.atan2(dx, -dz) * 180) / Math.PI; // 0 = north, 90 = east
+  return COMPASS[Math.round(((angle + 360) % 360) / 45) % 8];
+}
+
 export function fmtPos(p) {
   return `${Math.floor(p.x)} ${Math.floor(p.y)} ${Math.floor(p.z)}`;
 }

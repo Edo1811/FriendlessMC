@@ -1,5 +1,7 @@
 import vec3 from 'vec3';
 import { abortable, sleep, findEntity, fmtPos, playerEntity, inventoryItem } from './util.js';
+import { stopPathing } from './pathing.js';
+import { startElytraFlying } from '../compat.js';
 
 export const CONTROL_KEYS = ['forward', 'back', 'left', 'right', 'jump', 'sprint', 'sneak'];
 
@@ -7,13 +9,20 @@ const rad = (deg) => (deg * Math.PI) / 180;
 const deg = (r) => Math.round((r * 180) / Math.PI);
 
 // Holds keys like a player would, for `ms` milliseconds.
+// The pathfinder and pvp plugins also drive the keys, so they're cleared first and the keys
+// are pressed again every tick while held.
 export async function control(bot, { keys, ms = 500, yaw }, signal) {
+  stopPathing(bot);
+  bot.pvp?.stop();
   if (yaw !== undefined) await bot.look(rad(180 - yaw), bot.entity.pitch, true);
-  for (const key of keys) bot.setControlState(key, true);
+  const press = () => keys.forEach((key) => bot.setControlState(key, true));
+  press();
+  bot.on('physicsTick', press);
   const start = bot.entity.position.clone();
   try {
     await sleep(ms, signal);
   } finally {
+    bot.removeListener('physicsTick', press);
     bot.clearControlStates();
   }
   return `Held ${keys.join('+')} for ${ms}ms. Moved from ${fmtPos(start)} to ${fmtPos(bot.entity.position)}.`;
@@ -66,7 +75,7 @@ export async function elytraFly(bot, { x, y, z }, signal) {
     bot.setControlState('jump', false);
     await sleep(150, signal);
   }
-  await bot.elytraFly();
+  startElytraFlying(bot);
 
   const deadline = Date.now() + 120_000;
   let lastBoost = 0;

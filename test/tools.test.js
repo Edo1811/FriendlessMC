@@ -134,3 +134,17 @@ test('follow refuses players who are offline or out of sight', async () => {
   bot.players.Edo.entity = null;
   assert.match(await call(tools, 'follow', { player: 'Edo' }), /can't see Edo/);
 });
+
+test('every action takes an optional say, said before acting', async () => {
+  const { bot, tools } = setup();
+  assert.ok(tools.go_to.inputSchema.shape.say, 'go_to has say');
+  assert.ok(tools.mine.inputSchema.shape.say, 'mine has say');
+  assert.equal(tools.status.inputSchema?.shape?.say, undefined, 'quick tools do not');
+  await call(tools, 'wait', { seconds: 1, say: 'one sec!' });
+  assert.equal(bot.said[0], 'one sec!');
+});
+
+test('screenshot explains when vision is off', async () => {
+  const { tools } = setup();
+  assert.match(await call(tools, 'screenshot', {}), /turned off/);
+});

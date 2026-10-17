@@ -1,5 +1,5 @@
 import { mentionsBot } from './chat.js';
-import { humansOnline, abortCurrentAction } from './state.js';
+import { abortCurrentAction } from './state.js';
 import { isHostile } from './actions/util.js';
 
 const MOB_CLOSE_DISTANCE = 6;
@@ -12,11 +12,10 @@ export function attachEvents(ctx) {
   const { bot, state, chat, brain, modes } = ctx;
   const timers = [];
 
+  // Only chat aimed at Claude interrupts what he's doing. Other chat still reaches him with
+  // the next tool result, without stopping the action or costing an extra turn.
   const isAddressed = (username, message, whisper) =>
-    whisper ||
-    mentionsBot(message, bot.username) ||
-    humansOnline(bot).length === 1 ||
-    state.focus?.by === username;
+    whisper || mentionsBot(message, bot.username) || state.focus?.by === username;
 
   const onChat = (username, message, whisper) => {
     if (username === bot.username) return;
@@ -45,16 +44,18 @@ export function attachEvents(ctx) {
     brain.wake(`${player.username} left`);
   });
 
-  let lastHealth = bot.health;
+  // health is unknown for a moment after spawning; don't compare against that
+  let lastHealth = Number.isFinite(bot.health) ? bot.health : null;
   let lastDamageWake = 0;
   bot.on('health', () => {
-    const took = lastHealth - bot.health;
+    if (!Number.isFinite(bot.health)) return;
+    const took = lastHealth === null ? 0 : lastHealth - bot.health;
     lastHealth = bot.health;
     if (took <= 0) return;
     if (bot.health <= LOW_HEALTH) abortCurrentAction(state, `health is low (${Math.round(bot.health)}/20)`);
     if (Date.now() - lastDamageWake > DAMAGE_WAKE_COOLDOWN_MS) {
       lastDamageWake = Date.now();
-      brain.wake(`you took ${took.toFixed(0)} damage (health ${Math.round(bot.health)}/20)`);
+      brain.wake(`you took ${took.toFixed(1)} damage (health ${bot.health.toFixed(1)}/20)`);
     }
   });
 

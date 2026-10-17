@@ -92,7 +92,6 @@ test('buildServer copies the world and writes everything the server needs', asyn
   assert.match(claudeMd, /Ops: Edo, Luca\./);
   assert.doesNotMatch(claudeMd, /\{\{/);
   assert.ok(fs.existsSync(path.join(server, '.claude', 'memory.md')));
-  assert.ok(fs.existsSync(path.join(server, '.claude', 'settings.json')));
 
   const config = loadConfig();
   assert.equal(config.mcVersion, '1.21.4');

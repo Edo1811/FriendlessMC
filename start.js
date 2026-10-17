@@ -4,6 +4,7 @@ import path from 'node:path';
 import fs from 'node:fs';
 import readline from 'node:readline';
 import { loadConfig, SERVER_DIR, ROOT, SKIN_URL } from './lib/config.js';
+import { raiseTrackingRanges } from './lib/spigot.js';
 
 const config = loadConfig();
 const log = (msg) => console.log(`[start] ${msg}`);
@@ -11,6 +12,16 @@ const log = (msg) => console.log(`[start] ${msg}`);
 if (!fs.existsSync(path.join(SERVER_DIR, 'paper.jar'))) {
   log('No server found. Run the setup wizard first: npm run wizard');
   process.exit(1);
+}
+
+// let Claude see players and mobs further away (spigot.yml only exists after the first start)
+const spigotFile = path.join(SERVER_DIR, 'spigot.yml');
+if (fs.existsSync(spigotFile)) {
+  const { yaml, changed } = raiseTrackingRanges(fs.readFileSync(spigotFile, 'utf8'));
+  if (changed) {
+    fs.writeFileSync(spigotFile, yaml);
+    log('Raised entity tracking ranges in spigot.yml so Claude can see further.');
+  }
 }
 
 log('Starting the Minecraft server...');

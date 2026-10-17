@@ -12,10 +12,10 @@ Claude joins a Minecraft world as a normal player called "Claude". Design doc: h
 
 ## Layout
 
-- `bot/`: Mineflayer bot. `index.js` connects; `events.js` turns game events into wakes and interrupts; `modes.js` handles asleep/normal/focus; `reflexes.js` does things without Claude (eating, hitting back); `actions/` are the game actions.
+- `bot/`: Mineflayer bot. `index.js` connects; `events.js` turns game events into wakes and interrupts; `modes.js` handles asleep/normal/focus; `reflexes.js` does things without Claude (eating, hitting back); `actions/` are the game actions. `compat.js` patches mineflayer bugs on newer versions (dig time, elytra). `vision/` renders screenshots with prismarine-viewer in a hidden Edge/Chrome (chunks translated to the renderer's 1.21.4 block ids).
 - `bridge/`: the Claude side. `brain.js` runs one long Agent SDK session and only pushes a turn when something happens; `tools.js` exposes the game actions as an in-process MCP server; `memory.js`; `files.js` limits Claude Code's file tools to the server folder (writes only in op mode).
 - `wizard/`: the one-time setup page (`npm run wizard`), served on http://localhost:4545.
-- `templates/`: what goes into `server/.claude/` (Claude's in-game CLAUDE.md, settings, memory).
+- `templates/`: what goes into `server/.claude/` (Claude's in-game CLAUDE.md and memory). Permissions are in code (`bridge/brain.js`, `bridge/files.js`), not settings files.
 - `start.js`: what the desktop shortcut runs (Paper server + bot).
 - `server/` (gitignored): the generated server.
 
