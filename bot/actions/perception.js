@@ -48,6 +48,7 @@ export function status(bot, state) {
     `Online players: ${humansOnline(bot).join(', ') || 'none'}`,
     `Nearby players: ${players.join(', ') || 'none'}`,
     `Nearby mobs: ${mobs.slice(0, 15).join(', ') || 'none'}`,
+    `Doing: ${state.action?.name ?? 'nothing'}${state.background ? `, ${state.background.name} in the background` : ''}`,
     `Mode: ${state.mode}${state.focus ? ` (focus for ${state.focus.by})` : ''}, op mode: ${
       state.opMode.enabled ? `ON (unlocked by ${state.opMode.by})` : 'off'
     }`,

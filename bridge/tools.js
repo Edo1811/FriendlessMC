@@ -2,7 +2,7 @@ import { tool, createSdkMcpServer } from '@anthropic-ai/claude-agent-sdk';
 import { z } from 'zod';
 import { isOp } from '../lib/config.js';
 import { ChatLog } from '../bot/chat.js';
-import { humansOnline, abortCurrentAction } from '../bot/state.js';
+import { humansOnline, abortCurrentAction, stopBackground } from '../bot/state.js';
 import * as perception from '../bot/actions/perception.js';
 import * as movement from '../bot/actions/movement.js';
 import * as gathering from '../bot/actions/gathering.js';
@@ -48,13 +48,15 @@ export function createGameServer(ctx) {
     return null;
   };
 
-  // Wraps a long game action: one at a time, interruptible by chat.
-  const action = (name, fn) => async (args) => {
+  // Wraps a long game action: one at a time, interruptible by chat. Most actions take over
+  // movement, so they end a background activity like following, unless keepBackground is set.
+  const action = (name, fn, { keepBackground = false } = {}) => async (args) => {
     try {
       const bot = requireBot();
       if (ctx.state.action) {
         return reply(`Already doing "${ctx.state.action.name}". Wait for it or call stop first.`);
       }
+      if (!keepBackground) stopBackground(ctx.state);
       const controller = new AbortController();
       ctx.state.action = { name, controller };
       try {
@@ -117,7 +119,7 @@ export function createGameServer(ctx) {
     }, action('wait', async (_bot, { seconds }, signal) => {
       await sleep(seconds * 1000, signal);
       return `Waited ${seconds}s.`;
-    })),
+    }, { keepBackground: true })),
 
     // ---- moving ----
     tool('go_to', 'Walk to coordinates.', { x: coord, y: coord, z: coord, range: z.number().int().min(0).max(10).optional() },
@@ -126,16 +128,25 @@ export function createGameServer(ctx) {
     tool('go_to_player', 'Walk up to a player.', { player: z.string(), distance: z.number().int().min(1).max(10).optional() },
       action('go_to_player', (bot, a, s) => movement.goToPlayer(bot, a, s))),
 
-    tool('follow', 'Follow a player for a while. Stops when interrupted, when they vanish, or after max_seconds.', {
+    tool('follow', 'Start following a player. It keeps going in the background while you chat and think, until you call stop, start another movement action, or it ends by itself (they leave, you get stuck); then you get told why.', {
       player: z.string(),
       distance: z.number().int().min(1).max(10).optional(),
-      max_seconds: z.number().int().min(5).max(600).optional(),
-    }, action('follow', (bot, { player, distance, max_seconds }, s) =>
-      movement.follow(bot, { player, distance, maxSeconds: max_seconds }, s))),
+    }, quick(({ player, distance }) => {
+      const bot = requireBot();
+      stopBackground(ctx.state);
+      const follow = movement.startFollow(bot, { player, distance }, (reason) => {
+        if (ctx.state.background === follow) ctx.state.background = null;
+        ctx.brain?.wake(`you stopped following: ${reason}`);
+      });
+      if (follow.error) return follow.error;
+      ctx.state.background = follow;
+      return `Now ${follow.name}. You can keep chatting; it continues until you stop it.`;
+    })),
 
     tool('stop', 'Stop moving/fighting/digging/flying right now.', {}, quick(() => {
       const bot = requireBot();
       abortCurrentAction(ctx.state, 'stop was called');
+      stopBackground(ctx.state);
       bot.pathfinder.setGoal(null);
       bot.pvp.stop();
       bot.stopDigging();
@@ -164,7 +175,8 @@ export function createGameServer(ctx) {
     tool('use_item', 'Right click with the held item: eat, drink, throw pearls/snowballs, use buckets, shield... hold_ms keeps it pressed (about 1000 to fully draw a bow).', {
       offhand: z.boolean().optional(),
       hold_ms: z.number().int().min(0).max(5000).optional(),
-    }, action('use_item', (bot, { offhand, hold_ms }, s) => interact.useItem(bot, { offhand, holdMs: hold_ms }, s))),
+    }, action('use_item', (bot, { offhand, hold_ms }, s) => interact.useItem(bot, { offhand, holdMs: hold_ms }, s),
+      { keepBackground: true })),
 
     tool('use_block', 'Walk up to a block and right click it: doors, trapdoors, gates, levers, buttons, note blocks, beds, bells...', {
       x: coord, y: coord, z: coord,

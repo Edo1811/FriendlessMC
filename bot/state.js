@@ -8,7 +8,14 @@ export function createState(config) {
     focus: null,
     // { name, controller } while a game action is running
     action: null,
+    // { name, stop() } for something that keeps going between turns, like following a player
+    background: null,
   };
+}
+
+export function stopBackground(state) {
+  state.background?.stop();
+  state.background = null;
 }
 
 export function humansOnline(bot) {

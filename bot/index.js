@@ -4,7 +4,7 @@ import collectBlockPkg from 'mineflayer-collectblock';
 import pvpPkg from 'mineflayer-pvp';
 import { loader as autoEat } from 'mineflayer-auto-eat';
 import { loadConfig } from '../lib/config.js';
-import { createState } from './state.js';
+import { createState, stopBackground } from './state.js';
 import { ChatLog } from './chat.js';
 import { ModeManager } from './modes.js';
 import { attachEvents } from './events.js';
@@ -67,6 +67,7 @@ function connect() {
     detachEvents?.();
     if (ctx.bot === bot) ctx.bot = null;
     ctx.state.action?.controller.abort(new Error('disconnected'));
+    stopBackground(ctx.state);
     ctx.state.mode = 'asleep';
     setTimeout(connect, RECONNECT_MS);
   });

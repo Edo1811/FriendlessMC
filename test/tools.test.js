@@ -1,8 +1,8 @@
-import { test } from 'node:test';
+import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import { createGameServer } from '../bridge/tools.js';
-import { createState } from '../bot/state.js';
+import { createState, abortCurrentAction } from '../bot/state.js';
 import { ChatLog } from '../bot/chat.js';
 import { sleep } from '../bot/actions/util.js';
 
@@ -68,4 +68,69 @@ test('a long action is interrupted and only one runs at a time', async () => {
   ctx.state.action.controller.abort(new Error('Edo said: claude come here'));
   assert.match(await waiting, /Interrupted: Edo said: claude come here/);
   assert.equal(ctx.state.action, null);
+});
+
+function followSetup() {
+  const s = setup();
+  const { bot, ctx } = s;
+  const vec3 = (x, y, z) => ({ x, y, z, clone() { return vec3(x, y, z); }, offset(a, b, c) { return vec3(x + a, y + b, z + c); },
+    distanceTo(o) { return Math.hypot(o.x - x, o.y - y, o.z - z); } });
+  bot.entity = { position: vec3(0, 64, 0), yaw: 0 };
+  bot.players = { Claude: { username: 'Claude', entity: bot.entity }, Edo: { username: 'Edo', entity: { position: vec3(20, 64, 0) } } };
+  bot.goals = [];
+  bot.pathfinder = { setGoal: (g) => bot.goals.push(g), isMoving: () => false, stop() {} };
+  bot.pvp = { target: null, stop() {} };
+  bot.clearControlStates = () => {};
+  bot.stopDigging = () => {};
+  Object.assign(bot, {
+    entities: {}, health: 20, food: 20, time: { timeOfDay: 3000 }, isRaining: false, heldItem: null,
+    game: { dimension: 'overworld' }, inventory: { items: () => [] }, blockAt: () => ({ name: 'grass_block' }),
+  });
+  const wakes = [];
+  ctx.brain = { wake: (r) => wakes.push(r) };
+  lastFollowState = ctx.state;
+  return { ...s, wakes, vec3 };
+}
+
+// a failed assertion must not leave a follow timer running
+let lastFollowState = null;
+afterEach(() => lastFollowState?.background?.stop());
+
+test('follow runs in the background and walks toward the player', async () => {
+  const { ctx, bot, tools } = followSetup();
+  assert.match(await call(tools, 'follow', { player: 'edo' }), /Now following Edo/);
+  assert.equal(ctx.state.action, null, 'the action slot is free, so Claude can keep talking');
+  assert.ok(bot.goals.at(-1), 'a path goal was set');
+  assert.equal(bot.goals.at(-1).x, 20);
+  assert.match(await call(tools, 'status'), /following Edo in the background/);
+  ctx.state.background.stop();
+});
+
+test('chat does not cancel following; stop and other movement do', async () => {
+  const { ctx, tools } = followSetup();
+  await call(tools, 'follow', { player: 'Edo' });
+  abortCurrentAction(ctx.state, 'Edo said: lol');
+  assert.ok(ctx.state.background, 'still following after chat');
+  await call(tools, 'stop');
+  assert.equal(ctx.state.background, null);
+
+  await call(tools, 'follow', { player: 'Edo' });
+  await call(tools, 'go_to', { x: 1, y: 64, z: 1 }).catch(() => {});
+  assert.equal(ctx.state.background, null, 'go_to ended the follow');
+});
+
+test('follow ends by itself when the player leaves, and Claude is told', async () => {
+  const { ctx, bot, tools, wakes } = followSetup();
+  await call(tools, 'follow', { player: 'Edo' });
+  delete bot.players.Edo;
+  await sleep(500);
+  assert.equal(ctx.state.background, null);
+  assert.match(wakes.at(-1), /stopped following: Edo left the game/);
+});
+
+test('follow refuses players who are offline or out of sight', async () => {
+  const { bot, tools } = followSetup();
+  assert.match(await call(tools, 'follow', { player: 'Luca' }), /isn't online/);
+  bot.players.Edo.entity = null;
+  assert.match(await call(tools, 'follow', { player: 'Edo' }), /can't see Edo/);
 });

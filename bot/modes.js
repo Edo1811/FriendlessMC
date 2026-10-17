@@ -1,4 +1,4 @@
-import { humansOnline, abortCurrentAction } from './state.js';
+import { humansOnline, abortCurrentAction, stopBackground } from './state.js';
 
 export const FOCUS_IDLE_MS = 3 * 60_000;
 export const FOCUS_CHECK_IN_MS = 30 * 60_000;
@@ -97,6 +97,7 @@ export class ModeManager {
     state.focus = null;
     state.opMode = { enabled: false, by: null };
     abortCurrentAction(state, 'everyone left');
+    stopBackground(state);
     bot.pathfinder?.setGoal(null);
   }
 }
