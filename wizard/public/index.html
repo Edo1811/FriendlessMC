@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Claude server setup</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <div class="logo"></div>
+      <div>
+        <h1>Claude server setup</h1>
+        <p class="sub">Builds a LAN server from one of your singleplayer worlds, with Claude as a player. You only do this once.</p>
+      </div>
+    </header>
+
+    <ol class="steps" id="steps"></ol>
+
+    <section data-step="0">
+      <h2>1. Check</h2>
+      <p>The server needs Java, the bot needs Node.js, and Claude needs Claude Code to sign in.</p>
+      <ul class="checks" id="checks"><li>Checking...</li></ul>
+      <div class="actions"><button id="recheck" class="ghost">Check again</button><button id="next0" disabled>Next</button></div>
+    </section>
+
+    <section data-step="1" hidden>
+      <h2>2. World</h2>
+      <p>Pick the world to use. It gets <b>copied</b>, never moved, so your singleplayer world stays as it is.</p>
+      <label class="row">Saves folder <input id="savesDir" spellcheck="false"><button id="reloadWorlds" class="ghost small">Reload</button></label>
+      <div id="worlds" class="list"></div>
+      <div class="actions"><button class="ghost back">Back</button><button id="next1" disabled>Next</button></div>
+    </section>
+
+    <section data-step="2" hidden>
+      <h2>3. Version</h2>
+      <p>Everyone who joins must use this Minecraft version. Only versions both Paper and the bot support are listed.</p>
+      <div id="versions" class="list"></div>
+      <p id="versionWarning" class="warn" hidden>Upgrading only goes one way: after this, the server copy of the world can't go back to the old version. Your original world isn't touched.</p>
+      <div class="actions"><button class="ghost back">Back</button><button id="next2" disabled>Next</button></div>
+    </section>
+
+    <section data-step="3" hidden>
+      <h2>4. Server</h2>
+      <p>The server runs in offline mode with SkinsRestorer, so Claude gets its orange skin and everyone else keeps theirs.</p>
+      <label>Your Minecraft name <input id="owner" placeholder="e.g. Edo" spellcheck="false"></label>
+      <label>Other ops (optional, one per line)
+        <textarea id="ops" rows="3" placeholder="Names of people who can unlock op mode, start focus mode and edit Claude's memory" spellcheck="false"></textarea>
+      </label>
+      <p class="hint">Offline mode means anyone on your Wi-Fi could join with an op's name. That's the accepted trade-off for a LAN-only server.</p>
+      <div class="actions"><button class="ghost back">Back</button><button id="next3">Next</button></div>
+    </section>
+
+    <section data-step="4" hidden>
+      <h2>5. EULA</h2>
+      <p>Mojang requires a person to accept the Minecraft End User License Agreement before running a server.
+        Read it at <a href="https://aka.ms/MinecraftEULA" target="_blank" rel="noreferrer">aka.ms/MinecraftEULA</a>.</p>
+      <label class="check"><input type="checkbox" id="eula"> I've read and accept the Minecraft EULA</label>
+      <div class="actions"><button class="ghost back">Back</button><button id="build" disabled>Build the server</button></div>
+      <pre id="buildLog" class="log" hidden></pre>
+    </section>
+
+    <section data-step="5" hidden>
+      <h2>6. The .claude folder</h2>
+      <p>Claude's files are in <code>server/.claude</code>:</p>
+      <ul class="checks">
+        <li class="ok"><b>CLAUDE.md</b>: who Claude is on this server and its rules ("how Claude thinks or behaves is Claude's call")</li>
+        <li class="ok"><b>memory.md</b>: Claude's private memory, empty for now</li>
+        <li class="ok"><b>settings.json</b>: permissions limited to the game actions and the memory file. Claude can't touch the rest of the PC, even if someone in chat tries to make it.</li>
+      </ul>
+      <div class="actions"><button id="next5">Next</button></div>
+    </section>
+
+    <section data-step="6" hidden>
+      <h2>7. Claude login</h2>
+      <p>Sign in with your normal Claude account. A window opens and your browser asks you to log in.</p>
+      <p id="loginStatus" class="status">Checking...</p>
+      <div class="actions"><button id="login">Sign in</button><button id="loginRefresh" class="ghost">I signed in, check again</button></div>
+      <details>
+        <summary>Use an API key instead</summary>
+        <p class="hint">An Anthropic Console API key is billed per use instead of using your plan.</p>
+        <label class="row"><input id="apiKey" type="password" placeholder="sk-ant-..." spellcheck="false"><button id="saveKey" class="ghost small">Save</button></label>
+      </details>
+      <div class="actions"><button id="next6" disabled>Next</button></div>
+    </section>
+
+    <section data-step="7" hidden>
+      <h2>8. Shortcut</h2>
+      <p>Creates <b>Start Claude server</b> on your desktop. It starts the server and Claude together.</p>
+      <div class="actions"><button id="shortcut">Create shortcut</button></div>
+      <p id="shortcutStatus" class="status"></p>
+      <div id="finished" hidden class="done">
+        <h3>All set!</h3>
+        <p>Double-click <b>Start Claude server</b>, open Minecraft <b id="finalVersion"></b>, go to Multiplayer and join this PC
+          (it shows up under LAN, or add <code>localhost</code> on this PC / this PC's IP on others).</p>
+      </div>
+    </section>
+  </main>
+  <script src="/app.js" type="module"></script>
+</body>
+</html>

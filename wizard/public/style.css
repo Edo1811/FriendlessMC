@@ -1,0 +1,101 @@
+:root {
+  --bg: #1b1a18;
+  --panel: #262421;
+  --line: #3a3733;
+  --text: #ece8e1;
+  --muted: #a7a197;
+  --accent: #d97757;
+  --accent-dark: #b85f42;
+  --ok: #7fb36a;
+  --bad: #e06c5a;
+  --warn: #e3b25a;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 15px/1.5 system-ui, "Segoe UI", sans-serif;
+}
+
+main { max-width: 760px; margin: 0 auto; padding: 32px 16px 64px; }
+
+header { display: flex; gap: 16px; align-items: center; margin-bottom: 24px; }
+.logo { width: 56px; height: 56px; flex: none; background: var(--accent); image-rendering: pixelated;
+  box-shadow: inset -6px -6px 0 var(--accent-dark), inset 6px 6px 0 #e8977c; }
+h1 { margin: 0; font-size: 26px; }
+h2 { margin-top: 0; }
+.sub { margin: 4px 0 0; color: var(--muted); }
+
+.steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 20px; }
+.steps li { flex: 1; height: 6px; background: var(--line); }
+.steps li.past { background: var(--accent-dark); }
+.steps li.current { background: var(--accent); }
+
+section { background: var(--panel); border: 1px solid var(--line); padding: 24px; }
+
+label { display: block; margin: 14px 0; color: var(--muted); }
+label.row { display: flex; gap: 8px; align-items: center; }
+label.check { display: flex; gap: 10px; align-items: center; color: var(--text); }
+input, textarea {
+  display: block; width: 100%; margin-top: 6px; padding: 9px 10px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line); font: inherit;
+}
+label.row input { margin-top: 0; flex: 1; }
+input[type="checkbox"] { width: 18px; height: 18px; margin: 0; accent-color: var(--accent); }
+
+button {
+  padding: 10px 18px; border: 0; background: var(--accent); color: #1b1a18;
+  font: inherit; font-weight: 600; cursor: pointer;
+}
+button:hover:not(:disabled) { background: #e5876a; }
+button:disabled { opacity: 0.4; cursor: default; }
+button.ghost { background: transparent; color: var(--text); border: 1px solid var(--line); }
+button.ghost:hover:not(:disabled) { background: var(--line); }
+button.small { padding: 8px 12px; }
+
+.actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+
+.list { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+.option {
+  display: flex; justify-content: space-between; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--line); cursor: pointer; text-align: left; background: var(--bg); color: var(--text); font-weight: 400;
+}
+.option:hover:not(:disabled) { border-color: var(--accent); background: var(--bg); }
+.option.selected { border-color: var(--accent); box-shadow: inset 4px 0 0 var(--accent); }
+.option .meta { color: var(--muted); font-size: 13px; }
+.tag { font-size: 12px; padding: 1px 8px; border: 1px solid var(--line); color: var(--muted); }
+.tag.same { color: var(--ok); border-color: var(--ok); }
+.tag.newer { color: var(--warn); border-color: var(--warn); }
+
+.checks { list-style: none; padding: 0; }
+.checks li { padding: 6px 0 6px 26px; position: relative; }
+.checks li::before { content: "…"; position: absolute; left: 0; color: var(--muted); }
+.checks li.ok::before { content: "✔"; color: var(--ok); }
+.checks li.bad::before { content: "✖"; color: var(--bad); }
+.checks .fix { display: block; color: var(--muted); font-size: 13px; }
+
+.warn { color: var(--warn); }
+.hint { color: var(--muted); font-size: 13px; }
+.status { color: var(--muted); }
+.status.ok { color: var(--ok); }
+.status.bad { color: var(--bad); }
+
+.log {
+  background: var(--bg); border: 1px solid var(--line); padding: 12px; margin-top: 16px;
+  max-height: 260px; overflow: auto; white-space: pre-wrap; font-size: 13px;
+}
+.log .error { color: var(--bad); }
+
+details { margin-top: 18px; color: var(--muted); }
+summary { cursor: pointer; }
+code { background: var(--bg); padding: 1px 5px; }
+a { color: var(--accent); }
+.done { margin-top: 18px; border-top: 1px solid var(--line); padding-top: 8px; }
+
+@media (max-width: 520px) {
+  header { align-items: flex-start; }
+  label.row { flex-wrap: wrap; }
+}
